@@ -24,8 +24,8 @@ We will import the bright image data from the "ImagematrXI" library for analysis
 
 ```{r LoadUrbanHVData}
 # Use your paths
-source("E:/SAR/imagematrix.R")
-load("E:/SAR/Statistics-SAR-Intensity-master/Data/R/bright.Rdata")
+source("./imagematrix.R")
+load("./bright.Rdata")
 # Inspect what they are in the Environment window
 ```
 

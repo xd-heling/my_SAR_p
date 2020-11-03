@@ -1,0 +1,269 @@
+---
+title: "Report3"
+author: "Cao Fei, He Ling, Man Zhaolong, Zhen qi"
+date: "2020/11/2"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(reshape2)
+require(ggplot2)
+require(ggthemes)
+theme_set(theme_minimal())
+require(GGally)
+require(ggExtra)
+```
+
+
+```{r Load_Data}
+# Use your paths
+source("./imagematrix.R")
+load("./bright.Rdata")
+# Inspect what they are in the Environment window
+
+typeof(bright)
+dim(bright)
+range(bright)
+
+vector.bright <- data.frame(bright=as.vector(bright))
+summary(vector.bright)
+```
+
+```{r img_plot}
+plot(imagematrix(normalize(bright)))
+
+
+ecdf.bright <- ecdf(unlist(vector.bright))
+eq.bright <- ecdf.bright(unlist(vector.bright))
+dim(eq.bright) <- dim(bright)
+plot(imagematrix(eq.bright))
+
+
+plot(imagematrix(normalize(log(bright))))
+
+```
+
+```{r Graphical_EDA_BoxplotAndHistogram}
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(vector.bright)),
+                 col="black", fill="white") +
+  geom_boxplot(aes(y=1), width=.1) +
+  ylab("Density and Boxplot") +
+  xlab("Intensity in semilogarithmic scale") +
+  scale_x_log10()
+
+
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED", color="black",bins=nclass.FD(unlist(vector.bright))/250) +
+  geom_density(col="red", size=1) +
+  geom_boxplot(aes(y=1), width=.1)+
+  stat_ecdf(col="green") +
+  ylab("Histogram & smoothed histogram")+
+  scale_x_log10()
+```
+
+
+## The first distribution -- the (SAR) Gamma distribution
+
+```{r gammaSAR_Distributions}
+
+dgammaSAR <- function(x, L, m) {
+  L^L*x^(L-1)*exp(-L*x/m)/m^L/prod(seq(L))
+}
+
+```
+
+The distribution expression is $f_{\Gamma}(z;L,\mu)=\frac{L^{L}}{\mu^{L} \Gamma(L)} z^{L-1}exp{\{- \frac{Lz}{\mu}\}}$.
+
+1.Moment Estimation (L=1)
+
+$$
+\begin{cases}
+E(z)=\mu \\
+Var(z)=\frac{\mu ^{2}}{L}=\mu^{2}
+\end{cases}
+$$
+
+According to the above formula, we can get the estimated value of the parameter.
+
+$$
+\begin{cases}
+\hat{\mu}=E(z)\\
+\hat{L}=\frac{E(z)^2}{Var(z)}=1
+\end{cases}
+$$
+
+
+2.Maximun Likelihood Estimation
+
+The likelihood function is expressed as $g(Z;L,\mu)=\prod \limits_{i=0}^n f_{\Gamma}(z_{i};L,\mu)=\prod \limits_{i=1}^{n} \frac{L^{L}}{\mu^{L}\Gamma(L)} z_{i}^{L-1}exp{\{- \frac{Lz_{i}}{\mu}\}}=(\frac{L^{L}}{\mu^{L} \Gamma(L)})^{n} \cdot (\prod \limits_{i=1}^n z_{i})^{L-1}exp{\{- \frac{L}{\mu} \prod \limits_{i=1}^n z_{i}\}}$.
+The logarithmic likelihood function is expressed as $ln(g(L,\mu))=n \cdot ln(\frac{L^{L}}{\mu^{L}\cdot\Gamma(L)})+(L-1)\sum\limits_{i=1}^{n} ln(z_{i})-\frac{L}{\mu}\sum\limits_{i=1}^n z_{i}$.
+
+The maximum likelihood estimation of $\mu$ can be obtained by taking the derivative with respect to $\mu$ ($\frac{\partial ln(g(Z;L,\mu))}{\partial \mu}=n\cdot \frac{\mu^{L}\Gamma(L)}{L^{L-1}}\cdot(-\frac{L^{L}}{\Gamma(L)\mu^{L+1}})+\frac{L}{\mu^{2}}\sum\limits_{i=1}^nz_{i}$) and setting the partial derivative equal to 0 ($-\frac{n}{\mu}+\frac{1}{\mu^2}\sum\limits_{i=1}^nz_{i}=0$).
+
+The estimate of parameter $\mu$ is $\frac{1}{n}\sum\limits_{i=1}^nz_{i}$.
+
+
+```{r SAR_Gamma_estimate}
+# SAR Gamma
+
+mu_estimate<-mean(bright)
+L<-1
+
+cat("fit alpha:", mu_estimate,"\r\n")
+
+ggplot(data=data.frame(x=seq(1, 1e8, length.out = 1e5)), aes(x=x)) +
+  stat_function(fun=dgammaSAR, geom = "line", size=1, col="red", args = list(L=1, m=mu_estimate)) +
+  theme_classic() +
+  theme(text = element_text(size=10)) +
+  xlab("x") + ylab("sar_Gamma_estimate")+scale_x_log10()
+
+```
+
+## The second distribution -- the $G_{I}^{0}$ distribution
+
+
+```{r G0_Distributions}
+
+dG0 <- function(x, a, g, L) {
+  L^L*prod(seq(L-a))*x^(L-1)/g^a/prod(seq(L))/prod(seq(-a))/(g+L*x)^(L-a)
+}
+
+```
+
+The distribution expression is $f_{Z}(z;\alpha,\gamma,L)=\frac{L^{L}\Gamma(L-\alpha)}{\gamma^{\alpha}\Gamma^(L) \Gamma(-\alpha)} \frac{z^{L-1}}{(\gamma+Lz)^{L-\alpha}}$.
+The k-order moment of Z is expressed as $E(Z^{k})=(\frac{\gamma}{L})^k\frac{\Gamma(-\alpha-k)}{\Gamma(-\alpha)}\frac{\Gamma(L+k)}{\Gamma(L)}$.
+
+1.Moment Estimation (L = 1)
+
+$$
+\begin{cases}
+E(z)=\frac{\gamma}{-\alpha-1} \\
+Var(z)=E(z^{2})-(E(z))^{2}=\gamma^2\frac{\Gamma(-\alpha-2)}{\Gamma(-\alpha)}\frac{\Gamma(1+2)}{\Gamma(1)}=\frac{2\gamma^{2}}{(-\alpha-1)(-\alpha-2)}-(\frac{\gamma}{-\alpha-1})^{2}
+\end{cases}
+$$
+
+By means of the above formulation, we can obtained the moment estimate of the parameter.
+
+$$
+\begin{cases}
+E(z)=\frac{\gamma}{-\alpha-1} \\
+Var(z)=\frac{\gamma^{2}\alpha}{(\alpha+1)^2(\alpha+2)}
+\end{cases}
+$$
+According to the above formula, we can get the estimated value of the parameter.
+
+
+$$
+\begin{cases}
+\hat{\alpha}=\frac{2Var(z)}{(E(z))^{2}-Var(z)}\\
+\hat{\gamma}=\frac{(E(z))^3+E(z)Var(z)}{Var(z)-(E(z))^2}
+\end{cases}
+$$
+
+```{r G0_moment_estimate}
+# G0
+
+m<-mean(bright)
+v<-var(bright)
+a_estimate_1 <- 2*v/(m^2-v)
+g_estimate_1 <- (m^3+m*v)/(v-m^2)
+L<-1
+
+cat("fit alpha:", a_estimate_1,"\r\n")
+cat("fit gamma:", g_estimate_1,"\r\n")
+
+ggplot(data=data.frame(x=seq(1, 1e8, length.out = 1e5)), aes(x=x)) +
+  stat_function(fun=dG0, geom = "line", size=1, col="red", args = list(a=a_estimate_1, g=g_estimate_1, L=1)) +
+  theme_classic() +
+  theme(text = element_text(size=10)) +
+  xlab("x") + ylab("G0_moment_estimate")+scale_x_log10()
+
+```
+
+2.Maximun Likelihood Estimation
+
+The likelihood function is expressed as $g(Z,1;\alpha,\gamma)=\prod \limits_{i=0}^n f_{Z}(z_{i};\alpha,\gamma,L)=\prod \limits_{i=1}^{n} \frac{L^{L}\Gamma(L-\alpha)}{\gamma^{\alpha}\Gamma(L) \Gamma(-\alpha)} \frac{z_{i}^{L-1}}{(\gamma+Lz_{i})^{L-\alpha}}$.
+
+The logarithmic likelihood function is expressed as $ln(g(Z,1;\alpha,\gamma))=ln\frac{\Gamma(1-\alpha)}{\gamma^{\alpha}\Gamma(-\alpha)}+\sum\limits_{i=1}^nln\frac{z_{i}}{\gamma+z_{i}}+\alpha\sum\limits_{i=1}^nln(\gamma+z_{i})=ln(-\alpha)-\alpha ln(\gamma)+\sum\limits_{i=1}^nlnz_{i}+(\alpha-1)\sum\limits_{i=1}^nln(\gamma+z_{i})$.
+
+The maximum likelihood estimation of $\alpha$ and $\gamma$ can be obtained by taking the derivative with respect to $\alpha$ and $\gamma$ and setting the partial derivative equal to 0.
+
+$$
+\begin{cases}
+\frac{\partial ln(g(Z,1;\alpha,\gamma))}{\partial \alpha}=\frac{1}{\alpha}-ln\gamma+\sum\limits_{i=1}^nln(\gamma+z_{i})=0\\
+\frac{\partial ln(g(Z,1;\alpha,\gamma))}{\partial \gamma}=-\frac{\alpha}{\gamma}-(\alpha-1)\sum\limits_{i=1}^n\frac{1}{\gamma+z_{i}}=0
+\end{cases}
+$$
+
+By simplifying the above equation, we can get:
+
+$$
+\begin{cases}
+\alpha=\frac{1}{ln\gamma-\sum\limits_{i=1}^n ln(\gamma+z_{i})}=0\\
+-\gamma+\sum\limits_{i=1}^n\frac{1}{\gamma+z_{i}}[1-ln\gamma+\sum\limits_{i=1}^nln(\gamma+z_{i})]=0
+\end{cases}
+$$
+
+According to the relevant codes provided by the teacher, the maximum likelihood estimation of parameters $alpha$ and $\gamma$ can be obtained as follows:
+
+$$
+\begin{cases}
+\alpha=-2-\frac{2(E(z))^2}{(E(z))^2+var(z)}\\
+\gamma=E(z)\cdot(2+\frac{2(E(z))^2}{(E(z))^2+var(z)})
+\end{cases}
+$$
+
+```{r G0_likelihood_estimate}
+# G0
+
+m<-mean(bright)
+v<-var(bright)
+a_estimate_2 <- -2-2*m^2/(m^2+v)
+g_estimate_2 <- m*(2+2*m^2/(m^2+v))
+L<-1
+
+cat("fit alpha:", a_estimate_2,"\r\n")
+cat("fit gamma:", g_estimate_2,"\r\n")
+
+a_estimate_1 <- 2*v/(m^2-v)
+g_estimate_1 <- (m^3+m*v)/(v-m^2)
+
+ggplot(data=data.frame(x=seq(1, 1e8, length.out = 1e5)), aes(x=x)) +
+  stat_function(fun=dG0, geom = "line", size=1, col="red", args = list(a=a_estimate_2, g=g_estimate_2, L=1)) +
+  theme_classic() +
+  theme(text = element_text(size=10)) +
+  xlab("x") + ylab("G0_likelihood_estimate")+scale_x_log10()
+
+```
+
+```{r G0_comparison}
+# comparison
+m<-mean(bright)
+v<-var(bright)
+a_estimate_1 <- 2*v/(m^2-v)
+g_estimate_1 <- (m^3+m*v)/(v-m^2)
+a_estimate_2 <- -2-2*m^2/(m^2+v)
+g_estimate_2 <- m*(2+2*m^2/(m^2+v))
+L<-1
+
+cat("fit moment_estimation_alpha:", a_estimate_1,"\r\n")
+cat("fit moment_estimation_gamma:", g_estimate_1,"\r\n")
+cat("fit likelihood_estimation_alpha:", a_estimate_2,"\r\n")
+cat("fit likelihood_estimation_gamma:", g_estimate_2,"\r\n")
+
+
+ggplot(data=data.frame(x=seq(1, 1e8, length.out = 1e5)), aes(x=x)) +
+  stat_function(fun=dG0, geom = "line", size=1, col="red", args = list(a=a_estimate_1, g=g_estimate_1, L=1)) +
+  stat_function(fun=dG0, geom = "line", size=1, col="blue", args = list(a=a_estimate_2, g=g_estimate_2, L=1)) +
+  theme_classic() +
+  theme(text = element_text(size=10)) +
+  xlab("x") + ylab("G0_estimate_comparison")+scale_x_log10()
+```
+
+The red line is derived from the moment estimation method and the blue line is derived from the maximun likelihood estimation method.

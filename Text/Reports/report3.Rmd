@@ -21,8 +21,8 @@ require(ggExtra)
 
 ```{r Load_Data}
 # Use your paths
-source("./imagematrix.R")
-load("./bright.Rdata")
+source("../../Code/R/imagematrix.R")
+load("../../Data/Binary/bright.Rdata")
 # Inspect what they are in the Environment window
 
 typeof(bright)

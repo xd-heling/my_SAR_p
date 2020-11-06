@@ -16,6 +16,7 @@ require(ggthemes)
 theme_set(theme_minimal())
 require(GGally)
 require(ggExtra)
+require(maxLik)
 ```
 
 
@@ -23,6 +24,8 @@ require(ggExtra)
 # Use your paths
 source("../../Code/R/imagematrix.R")
 load("../../Data/Binary/bright.Rdata")
+load("../../Data/Binary/UrbanHV.Rdata")
+load("../../Data/Binary/dark.Rdata")
 # Inspect what they are in the Environment window
 
 typeof(bright)
@@ -42,9 +45,6 @@ eq.bright <- ecdf.bright(unlist(vector.bright))
 dim(eq.bright) <- dim(bright)
 plot(imagematrix(eq.bright))
 
-
-plot(imagematrix(normalize(log(bright))))
-
 ```
 
 ```{r Graphical_EDA_BoxplotAndHistogram}
@@ -52,31 +52,27 @@ ggplot(vector.bright, aes(x=bright)) +
   geom_histogram(aes(y=..density..),
                  bins=nclass.FD(unlist(vector.bright)),
                  col="black", fill="white") +
-  geom_boxplot(aes(y=1), width=.1) +
-  ylab("Density and Boxplot") +
-  xlab("Intensity in semilogarithmic scale") +
-  scale_x_log10()
+  ylab("Density") +
+  xlab("Intensity") 
+
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(vector.bright)),
+                 col="black", fill="white") +
+  ylab("Density") +
+  xlab("Intensity range:(0-4e6)") +
+  xlim(0,4e6)
 
 
 ggplot(vector.bright, aes(x=bright)) +
-  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED", color="black",bins=nclass.FD(unlist(vector.bright))/250) +
-  geom_density(col="red", size=1) +
-  geom_boxplot(aes(y=1), width=.1)+
-  stat_ecdf(col="green") +
-  ylab("Histogram & smoothed histogram")+
-  scale_x_log10()
+  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED", color="black",bins=nclass.FD(unlist(vector.bright))/100) +
+  ylab("Histogram")+
+  xlim(0,4e6)
 ```
 
 
 ## The first distribution -- the (SAR) Gamma distribution
 
-```{r gammaSAR_Distributions}
-
-dgammaSAR <- function(x, L, m) {
-  L^L*x^(L-1)*exp(-L*x/m)/m^L/prod(seq(L))
-}
-
-```
 
 The distribution expression is $f_{\Gamma}(z;L,\mu)=\frac{L^{L}}{\mu^{L} \Gamma(L)} z^{L-1}exp{\{- \frac{Lz}{\mu}\}}$.
 
@@ -108,33 +104,9 @@ The maximum likelihood estimation of $\mu$ can be obtained by taking the derivat
 
 The estimate of parameter $\mu$ is $\frac{1}{n}\sum\limits_{i=1}^nz_{i}$.
 
-
-```{r SAR_Gamma_estimate}
-# SAR Gamma
-
-mu_estimate<-mean(bright)
-L<-1
-
-cat("fit alpha:", mu_estimate,"\r\n")
-
-ggplot(data=data.frame(x=seq(1, 1e8, length.out = 1e5)), aes(x=x)) +
-  stat_function(fun=dgammaSAR, geom = "line", size=1, col="red", args = list(L=1, m=mu_estimate)) +
-  theme_classic() +
-  theme(text = element_text(size=10)) +
-  xlab("x") + ylab("sar_Gamma_estimate")+scale_x_log10()
-
-```
-
 ## The second distribution -- the $G_{I}^{0}$ distribution
 
 
-```{r G0_Distributions}
-
-dG0 <- function(x, a, g, L) {
-  L^L*prod(seq(L-a))*x^(L-1)/g^a/prod(seq(L))/prod(seq(-a))/(g+L*x)^(L-a)
-}
-
-```
 
 The distribution expression is $f_{Z}(z;\alpha,\gamma,L)=\frac{L^{L}\Gamma(L-\alpha)}{\gamma^{\alpha}\Gamma^(L) \Gamma(-\alpha)} \frac{z^{L-1}}{(\gamma+Lz)^{L-\alpha}}$.
 The k-order moment of Z is expressed as $E(Z^{k})=(\frac{\gamma}{L})^k\frac{\Gamma(-\alpha-k)}{\Gamma(-\alpha)}\frac{\Gamma(L+k)}{\Gamma(L)}$.
@@ -161,30 +133,12 @@ According to the above formula, we can get the estimated value of the parameter.
 
 $$
 \begin{cases}
-\hat{\alpha}=\frac{2Var(z)}{(E(z))^{2}-Var(z)}\\
-\hat{\gamma}=\frac{(E(z))^3+E(z)Var(z)}{Var(z)-(E(z))^2}
+\alpha=-2-\frac{2(E(z))^2}{(E(z))^2+var(z)}\\
+\gamma=E(z)\cdot(2+\frac{2(E(z))^2}{(E(z))^2+var(z)})
 \end{cases}
 $$
 
-```{r G0_moment_estimate}
-# G0
 
-m<-mean(bright)
-v<-var(bright)
-a_estimate_1 <- 2*v/(m^2-v)
-g_estimate_1 <- (m^3+m*v)/(v-m^2)
-L<-1
-
-cat("fit alpha:", a_estimate_1,"\r\n")
-cat("fit gamma:", g_estimate_1,"\r\n")
-
-ggplot(data=data.frame(x=seq(1, 1e8, length.out = 1e5)), aes(x=x)) +
-  stat_function(fun=dG0, geom = "line", size=1, col="red", args = list(a=a_estimate_1, g=g_estimate_1, L=1)) +
-  theme_classic() +
-  theme(text = element_text(size=10)) +
-  xlab("x") + ylab("G0_moment_estimate")+scale_x_log10()
-
-```
 
 2.Maximun Likelihood Estimation
 
@@ -210,60 +164,225 @@ $$
 \end{cases}
 $$
 
-According to the relevant codes provided by the teacher, the maximum likelihood estimation of parameters $alpha$ and $\gamma$ can be obtained as follows:
+According to the relevant codes provided by the teacher, the maximum likelihood estimation of parameters $alpha$ and $\gamma$ can be obtained.
 
-$$
-\begin{cases}
-\alpha=-2-\frac{2(E(z))^2}{(E(z))^2+var(z)}\\
-\gamma=E(z)\cdot(2+\frac{2(E(z))^2}{(E(z))^2+var(z)})
-\end{cases}
-$$
 
-```{r G0_likelihood_estimate}
-# G0
 
-m<-mean(bright)
-v<-var(bright)
-a_estimate_2 <- -2-2*m^2/(m^2+v)
-g_estimate_2 <- m*(2+2*m^2/(m^2+v))
-L<-1
+```{r gammaSAR_Distributions}
 
-cat("fit alpha:", a_estimate_2,"\r\n")
-cat("fit gamma:", g_estimate_2,"\r\n")
 
-a_estimate_1 <- 2*v/(m^2-v)
-g_estimate_1 <- (m^3+m*v)/(v-m^2)
 
-ggplot(data=data.frame(x=seq(1, 1e8, length.out = 1e5)), aes(x=x)) +
-  stat_function(fun=dG0, geom = "line", size=1, col="red", args = list(a=a_estimate_2, g=g_estimate_2, L=1)) +
-  theme_classic() +
-  theme(text = element_text(size=10)) +
-  xlab("x") + ylab("G0_likelihood_estimate")+scale_x_log10()
+dgammaSAR <- function(x, Looks, mean) {
+  
+  dgamma(x, shape=Looks, rate=Looks/mean)
+  
+}
+
 
 ```
 
-```{r G0_comparison}
+```{r G0_Distributions}
+
+dGI0 <- function(z, p_alpha, p_gamma, p_Looks) {
+  
+  
+  return( 
+    ( p_Looks^p_Looks * prod(seq(p_Looks-p_alpha)) * z^(p_Looks-1) ) / 
+    (p_gamma^p_alpha * prod(seq(-p_alpha)) * prod(seq(p_Looks)) * (p_gamma + z*p_Looks)^(p_Looks-p_alpha)) 
+  )
+  
+
+}
+
+```
+
+```{r G0_estimator}
+
 # comparison
-m<-mean(bright)
-v<-var(bright)
-a_estimate_1 <- 2*v/(m^2-v)
-g_estimate_1 <- (m^3+m*v)/(v-m^2)
-a_estimate_2 <- -2-2*m^2/(m^2+v)
-g_estimate_2 <- m*(2+2*m^2/(m^2+v))
-L<-1
 
-cat("fit moment_estimation_alpha:", a_estimate_1,"\r\n")
-cat("fit moment_estimation_gamma:", g_estimate_1,"\r\n")
-cat("fit likelihood_estimation_alpha:", a_estimate_2,"\r\n")
-cat("fit likelihood_estimation_gamma:", g_estimate_2,"\r\n")
+GI0.Estimator.m1m2 <- function(z, L) {
+  m1 <- mean(z)
+  m2 <- mean(z^2)
+  m212 <- m2/m1^2
+    
+  a <- -2 - (L+1) / (L * m212)
+  g <- m1 * (2 + (L+1) / (L * m212))
+  
+  return(list("alpha"=a, "gamma"=g))
+}
 
 
-ggplot(data=data.frame(x=seq(1, 1e8, length.out = 1e5)), aes(x=x)) +
-  stat_function(fun=dG0, geom = "line", size=1, col="red", args = list(a=a_estimate_1, g=g_estimate_1, L=1)) +
-  stat_function(fun=dG0, geom = "line", size=1, col="blue", args = list(a=a_estimate_2, g=g_estimate_2, L=1)) +
-  theme_classic() +
-  theme(text = element_text(size=10)) +
-  xlab("x") + ylab("G0_estimate_comparison")+scale_x_log10()
+LogLikelihoodLknown <- function(params) {
+  
+  p_alpha <- -abs(params[1])
+  p_gamma <- abs(params[2])
+  p_L <- abs(params[3])
+  
+  n <- length(z)
+  
+  return(
+    n*(lgamma(p_L-p_alpha) - p_alpha*log(p_gamma) - lgamma(-p_alpha)) + 
+      (p_alpha-p_L)*sum(log(p_gamma + z*p_L)) 
+  )
+}
+
 ```
 
-The red line is derived from the moment estimation method and the blue line is derived from the maximun likelihood estimation method.
+
+```{r bright}
+# comparison
+vUrbanHV <- data.frame(UHV=as.vector(bright))
+m<-mean(vUrbanHV$UHV)
+L<-1
+
+
+estim.Urban <- GI0.Estimator.m1m2(vUrbanHV$UHV, L)
+z <- vUrbanHV$UHV
+estim.UrbanML <- maxNR(LogLikelihoodLknown, 
+                       start=c(estim.Urban$alpha, estim.Urban$gamma,1), 
+                       activePar=c(TRUE,TRUE,FALSE))$estimate[1:2]
+
+# comparison
+
+
+a_estimate_1t <- estim.Urban$alpha
+g_estimate_1t <- estim.Urban$gamma
+
+a_estimate_2t <- estim.UrbanML[1]
+g_estimate_2t <- estim.UrbanML[2]
+
+intensity <- seq(1e-10, 4e6, length.out = 1e5)
+dExp <- dgammaSAR(intensity,Looks=L, mean=m)
+dGI0Mom <- dGI0(intensity, p_alpha=a_estimate_1t, p_gamma=g_estimate_1t, p_Looks=L)
+dGI0ML <- dGI0(intensity, p_alpha=a_estimate_2t, p_gamma=g_estimate_2t, p_Looks=L)
+
+
+
+df.densities <- data.frame(intensity, dExp, dGI0Mom, dGI0ML)
+densities.flat <- melt(df.densities, 
+                       measure.vars = c("dExp", "dGI0Mom", "dGI0ML"))
+
+names(densities.flat) <- c("Intensity", "Density", "value")
+
+ggplot(data=vUrbanHV, aes(x=UHV)) +
+geom_histogram(aes(y=..density..), col="black",
+bins=nclass.FD(unlist(vUrbanHV))/100) +
+geom_line(data=densities.flat, aes(x=Intensity, y=value, col=Density),
+lwd=1.5, alpha=.7) +
+xlab("Intensities from the bright") +
+ylab("Histogram, and fitted Exponential and G0 Laws") +
+ggtitle("Restricted Histogram and fitted densities") +
+theme_few()+
+xlim(0,4e6)
+
+
+```
+
+The green line is derived from the moment estimation method and the blue line is derived from the maximun likelihood estimation method.
+
+At the same time, we estimate the parameters of other data sets: UrbanHV and dark, and the results are shown as follows.
+
+#UrbanHV dataset
+
+```{r UrbanHV}
+
+# comparison
+
+vUrbanHV <- data.frame(UHV=as.vector(UrbanHV))
+m<-mean(vUrbanHV$UHV)
+L<-1
+
+
+estim.Urban <- GI0.Estimator.m1m2(vUrbanHV$UHV, L)
+z <- vUrbanHV$UHV
+estim.UrbanML <- maxNR(LogLikelihoodLknown, 
+                       start=c(estim.Urban$alpha, estim.Urban$gamma,1), 
+                       activePar=c(TRUE,TRUE,FALSE))$estimate[1:2]
+
+# comparison
+
+
+a_estimate_1t <- estim.Urban$alpha
+g_estimate_1t <- estim.Urban$gamma
+
+a_estimate_2t <- estim.UrbanML[1]
+g_estimate_2t <- estim.UrbanML[2]
+
+intensity <- seq(1e-10, 3e5, length.out = 1e5)
+dExp <- dgammaSAR(intensity,Looks=L, mean=m)
+dGI0Mom <- dGI0(intensity, p_alpha=a_estimate_1t, p_gamma=g_estimate_1t, p_Looks=L)
+dGI0ML <- dGI0(intensity, p_alpha=a_estimate_2t, p_gamma=g_estimate_2t, p_Looks=L)
+
+
+
+df.densities <- data.frame(intensity, dExp, dGI0Mom, dGI0ML)
+densities.flat <- melt(df.densities, 
+                       measure.vars = c("dExp", "dGI0Mom", "dGI0ML"))
+
+names(densities.flat) <- c("Intensity", "Density", "value")
+
+ggplot(data=vUrbanHV, aes(x=UHV)) +
+geom_histogram(aes(y=..density..), col="black",
+bins=nclass.FD(unlist(vUrbanHV))/100) +
+geom_line(data=densities.flat, aes(x=Intensity, y=value, col=Density),
+lwd=1.5, alpha=.7) +
+xlab("Intensities from the UrbanHV") +
+ylab("Histogram, and fitted Exponential and G0 Laws") +
+ggtitle("Restricted Histogram and fitted densities") +
+theme_few()+
+xlim(0,3e5)
+
+```
+
+
+#dark set
+
+```{r dark}
+
+# comparison
+
+vUrbanHV <- data.frame(UHV=as.vector(dark))
+m<-mean(vUrbanHV$UHV)
+L<-1
+
+
+estim.Urban <- GI0.Estimator.m1m2(vUrbanHV$UHV, L)
+z <- vUrbanHV$UHV
+estim.UrbanML <- maxNR(LogLikelihoodLknown, 
+                       start=c(estim.Urban$alpha, estim.Urban$gamma,1), 
+                       activePar=c(TRUE,TRUE,FALSE))$estimate[1:2]
+
+# comparison
+
+
+a_estimate_1t <- estim.Urban$alpha
+g_estimate_1t <- estim.Urban$gamma
+
+a_estimate_2t <- estim.UrbanML[1]
+g_estimate_2t <- estim.UrbanML[2]
+
+intensity <- seq(1e-10, 3e4, length.out = 1e5)
+dExp <- dgammaSAR(intensity,Looks=L, mean=m)
+dGI0Mom <- dGI0(intensity, p_alpha=a_estimate_1t, p_gamma=g_estimate_1t, p_Looks=L)
+dGI0ML <- dGI0(intensity, p_alpha=a_estimate_2t, p_gamma=g_estimate_2t, p_Looks=L)
+
+
+
+df.densities <- data.frame(intensity, dExp, dGI0Mom, dGI0ML)
+densities.flat <- melt(df.densities, 
+                       measure.vars = c("dExp", "dGI0Mom", "dGI0ML"))
+
+names(densities.flat) <- c("Intensity", "Density", "value")
+
+ggplot(data=vUrbanHV, aes(x=UHV)) +
+geom_histogram(aes(y=..density..), col="black",
+bins=nclass.FD(unlist(vUrbanHV))/50) +
+geom_line(data=densities.flat, aes(x=Intensity, y=value, col=Density),
+lwd=1.5, alpha=.7) +
+xlab("Intensities from the dark") +
+ylab("Histogram, and fitted Exponential and G0 Laws") +
+ggtitle("Restricted Histogram and fitted densities") +
+theme_few()+
+xlim(0,3e4)
+
+```

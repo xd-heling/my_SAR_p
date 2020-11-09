@@ -48,9 +48,12 @@ eq.bright <- ecdf.bright(unlist(vUrbanHV))
 dim(eq.bright) <- dim(bright[,,channal])
 plot(imagematrix(eq.bright))
 
+<<<<<<< HEAD
 plot(imagematrix(normalize(log(bright[,,channal]))))
 
 
+=======
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 ```
 
 ```{r Graphical_EDA_BoxplotAndHistogram}
@@ -60,6 +63,24 @@ ggplot(vUrbanHV, aes(x=vUrbanHV$UHV)) +
                  col="black", fill="white") +
   ylab("Density") +
   xlab("Intensity") 
+<<<<<<< HEAD
+=======
+
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),
+                 bins=nclass.FD(unlist(vector.bright)),
+                 col="black", fill="white") +
+  ylab("Density") +
+  xlab("Intensity range:(0-4e6)") +
+  xlim(0,4e6)
+
+
+ggplot(vector.bright, aes(x=bright)) +
+  geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED", color="black",bins=nclass.FD(unlist(vector.bright))/100) +
+  ylab("Histogram")+
+  xlim(0,4e6)
+```
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 
 ggplot(vUrbanHV, aes(x=vUrbanHV$UHV)) +
   geom_histogram(aes(y=..density..),
@@ -70,6 +91,7 @@ ggplot(vUrbanHV, aes(x=vUrbanHV$UHV)) +
   xlim(0,4e6)
 
 
+<<<<<<< HEAD
 ggplot(vUrbanHV, aes(x=vUrbanHV$UHV)) +
   geom_histogram(aes(y=..density..),alpha=0.5, fill="#6495ED", color="black",bins=nclass.FD(unlist(vUrbanHV))/25) +
   ylab("Histogram")+
@@ -79,6 +101,8 @@ ggplot(vUrbanHV, aes(x=vUrbanHV$UHV)) +
 
 ## The first distribution -- the (SAR) Gamma distribution
 
+=======
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 
 The distribution expression is $f_{\Gamma}(z;L,\mu)=\frac{L^{L}}{\mu^{L} \Gamma(L)} z^{L-1}exp{\{- \frac{Lz}{\mu}\}}$.
 
@@ -237,7 +261,11 @@ LogLikelihoodLknown <- function(params) {
 
 ```{r bright}
 # comparison
+<<<<<<< HEAD
 vUrbanHV <- data.frame(UHV=as.vector(bright[,,channal]))
+=======
+vUrbanHV <- data.frame(UHV=as.vector(bright))
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 m<-mean(vUrbanHV$UHV)
 L<-1
 
@@ -257,7 +285,11 @@ g_estimate_1t <- estim.Urban$gamma
 a_estimate_2t <- estim.UrbanML[1]
 g_estimate_2t <- estim.UrbanML[2]
 
+<<<<<<< HEAD
 intensity <- seq(1e-10, 5e6, length.out = 1e5)
+=======
+intensity <- seq(1e-10, 4e6, length.out = 1e5)
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 dExp <- dgammaSAR(intensity,Looks=L, mean=m)
 dGI0Mom <- dGI0(intensity, p_alpha=a_estimate_1t, p_gamma=g_estimate_1t, p_Looks=L)
 dGI0ML <- dGI0(intensity, p_alpha=a_estimate_2t, p_gamma=g_estimate_2t, p_Looks=L)
@@ -272,14 +304,22 @@ names(densities.flat) <- c("Intensity", "Density", "value")
 
 ggplot(data=vUrbanHV, aes(x=UHV)) +
 geom_histogram(aes(y=..density..), col="black",
+<<<<<<< HEAD
 bins=nclass.FD(unlist(vUrbanHV))/50) +
+=======
+bins=nclass.FD(unlist(vUrbanHV))/100) +
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 geom_line(data=densities.flat, aes(x=Intensity, y=value, col=Density),
 lwd=1.5, alpha=.7) +
 xlab("Intensities from the bright") +
 ylab("Histogram, and fitted Exponential and G0 Laws") +
 ggtitle("Restricted Histogram and fitted densities") +
 theme_few()+
+<<<<<<< HEAD
 xlim(0,5e6)
+=======
+xlim(0,4e6)
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 
 
 ```
@@ -329,7 +369,11 @@ names(densities.flat) <- c("Intensity", "Density", "value")
 
 ggplot(data=vUrbanHV, aes(x=UHV)) +
 geom_histogram(aes(y=..density..), col="black",
+<<<<<<< HEAD
 bins=nclass.FD(unlist(vUrbanHV))/50) +
+=======
+bins=nclass.FD(unlist(vUrbanHV))/100) +
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 geom_line(data=densities.flat, aes(x=Intensity, y=value, col=Density),
 lwd=1.5, alpha=.7) +
 xlab("Intensities from the UrbanHV") +
@@ -347,7 +391,11 @@ xlim(0,3e5)
 
 # comparison
 
+<<<<<<< HEAD
 vUrbanHV <- data.frame(UHV=as.vector(dark[,,channal]))
+=======
+vUrbanHV <- data.frame(UHV=as.vector(dark))
+>>>>>>> 7edd2a5ffbcf39845b86de3b9be84b720fa9d853
 m<-mean(vUrbanHV$UHV)
 L<-1
 

@@ -1,0 +1,367 @@
+---
+title: "Report 4"
+author: "Cao Fei, He Ling, Man Zhaolong, Zhen qi"
+date: "2020/11/7"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(reshape)
+require(reshape2)
+require(ggplot2)
+require(ggthemes)
+theme_set(theme_minimal())
+require(GGally)
+require(ggExtra)
+require(maxLik)
+require(png)
+```
+
+```{r Load_Data_1}
+# Use your paths
+load("../../Data/Binary/bright.Rdata")
+
+# Inspect what they are in the Environment window
+
+typeof(bright)
+dim(bright)
+range(bright)
+
+vector.bright <- data.frame(bright=as.vector(bright))
+summary(vector.bright)
+```
+
+
+
+## Rayleigh distribution
+
+The distribution expression is $f_{X}(x;\sigma^{2})=\frac{x}{\sigma^{2}}exp{\{- \frac{x^{2}}{2\sigma^{2}}\}}1_{\mathbb{R}^{+}}(x)$.
+
+1.Moment Estimation 
+
+$$
+\begin{cases}
+E(x)=\sqrt{\frac{\pi}{2}}\sigma \\
+Var(x)=\frac{4-\pi}{2}\sigma^{2}
+\end{cases}
+$$
+
+According to the above formula, we can get two estimated value of $\sigma^{2}$.
+
+$$
+\begin{cases}
+\hat{\sigma_{1}^{2}}=\frac{2}{\pi}(Ex)^{2}\\
+\hat{\sigma_{2}^{2}}=\frac{2Var(x)}{4-\pi}
+\end{cases}
+$$
+
+2.Maximun Likelihood Estimation
+
+The likelihood function is expressed as $g(X;\sigma^{2})=\prod \limits_{i=1}^n f_{X}(x_{i};\sigma^{2})=\prod \limits_{i=1}^n\frac{x_{i}}{\sigma^{2}}exp{\{- \frac{x_{i}^{2}}{2\sigma^{2}}\}}1_{\mathbb{R}^{+}}(x_{i})=\frac{1}{\sigma^{2n}} \cdot \prod \limits_{i=1}^n x_{i}\cdot\prod \limits_{i=1}^n exp{\{- \frac{x_{i}^{2}}{2\sigma^{2}}\}}1_{\mathbb{R}^{+}}(x_{i})$.
+
+The logarithmic likelihood function is expressed as $ln(g(X;\sigma^{2}))=ln(\sum\limits_{i=1}^{n}x_{i})-ln(\sigma^{2n})-\frac{1}{2\sigma^{2}}\sum\limits_{i=1}^{n}x_{i}^{2}$.
+
+The maximum likelihood estimation of $\sigma^{2}$ can be obtained by taking the derivative with respect to $\sigma^{2}$ ($\frac{\partial ln(g(X;\sigma^{2}))}{\partial \sigma^{2}}=-\frac{n}{\sigma^{2}}+\frac{1}{2(\sigma^{2})^{2}}\sum\limits_{i=1}^{n}x_{i}^{2}$) and setting the partial derivative equal to 0.
+
+The estimate of parameter $\sigma^{2}$ is $\frac{1}{2n}\sum\limits_{i=1}^{n}x_{i}^{2}$.
+
+```{r Rayleigh_Distributions_1}
+dRayleigh_1 <- function(x, s) {
+  
+  dweibull(x, shape=2, scale=sqrt(s*2))
+  
+}
+
+```
+
+```{r Rayleigh_Distributions_2}
+dRayleigh_2 <- function(x, s) {
+  
+  return ((x/s)*exp(-(x^2)/(2*s)))
+  
+}
+
+```
+
+```{r estimator}
+
+rayl_m1 <- function(x) {
+  
+  m1<-mean(x)
+  
+  return (2*m1^2/pi)
+  
+}
+
+rayl_v <- function(x) {
+  
+  v<-var(x)
+  
+  return (2*v/(4-pi))
+  
+}
+
+rayl_ML <- function(x) {
+  
+  m2<-mean(x^2)
+  
+  return (0.5*m2)
+  
+}
+
+```
+
+
+
+```{r Rayleigh_moment_estimate}
+
+vUrbanHV <- data.frame(UHV=as.vector(bright[,,2]))
+s_estimate1 <- rayl_m1(vUrbanHV$UHV)
+s_estimate2 <- rayl_v(vUrbanHV$UHV)
+s_estimate3 <- rayl_ML(vUrbanHV$UHV)
+
+sam_num<-50
+bootstrap <- matrix(nrow = sam_num, ncol = 1)
+n <- 5000
+for(r in 1:sam_num) 
+{  
+  z <- sample(vUrbanHV$UHV, n, replace=TRUE) 
+  bootstrap[r,1]<-rayl_m1(z)
+}
+s_estimate4<- 2*s_estimate1 -mean(bootstrap)
+
+
+cat("m1:",s_estimate1,"\n")
+cat("v:",s_estimate2,"\n")
+cat("ML:",s_estimate3,"\n")
+cat("bootstrap:",s_estimate4,"\n")
+
+limx<-1.5e6
+intensity <- seq(1e-1, limx, length.out = 1e5)
+d_ray_m1 <- dRayleigh_2(intensity, s=s_estimate1)
+d_ray_ML <- dRayleigh_2(intensity, s=s_estimate3)
+d_ray_bootstrap <- dRayleigh_2(intensity, s=s_estimate4)
+
+df.densities <- data.frame(intensity, d_ray_m1, d_ray_ML, d_ray_bootstrap)
+densities.flat <- melt(df.densities, 
+                       measure.vars = c("d_ray_m1", "d_ray_ML", "d_ray_bootstrap"))
+names(densities.flat) <- c("Intensity", "Density", "value")
+
+ggplot(data=vUrbanHV, aes(x=UHV)) + 
+  geom_line(data=densities.flat, aes(x=Intensity, y=value, col=Density),
+            lwd=1, alpha=.7) +
+  xlab("Intensities") +
+  ylab("fitted Rayleigh Laws") +
+  ggtitle("fitted densities") +
+  theme_few()+xlim(0,2e5)
+
+ggplot(data=vUrbanHV, aes(x=UHV)) + 
+  geom_histogram(aes(y=..density..), col="white",
+                 bins=nclass.FD(unlist(vUrbanHV))/7.5) + 
+  geom_line(data=densities.flat, aes(x=Intensity, y=value, col=Density),
+            lwd=1, alpha=.7) +
+  xlab("Intensities from the bright") +
+  ylab("Histogram, and fitted Rayleigh Laws") +
+  ggtitle("Restricted Histogram and fitted densities") +
+  theme_few()+xlim(0,limx)
+
+```
+
+```{r Load_Data_2}
+# Use your paths
+source("../../Code/R/imagematrix.R")
+strips=matrix(1:256,nrow = 256,ncol = 256)
+for(i in 1:256) {
+  for(j in 1:256) {
+    
+    if(i%/%10==8||i%/%10==12||i%/%10==13||i%/%10==17||i%/%10==18||i%/%10==19){
+      
+        strips[i,j] <-1
+    }
+    else{
+      if(j%/%10==1||j%/%10==6||j%/%10==7||j%/%10==16||j%/%10==21||j%/%10==23){
+        
+        strips[i,j] <-1
+      }
+      else{
+        strips[i,j] <-0
+      }
+    }
+  }
+}
+strips <- normalize(strips)
+dim(strips)
+```
+
+```{r img_plot}
+
+#shows a phantom that consists of many dark rectangles and white strips
+plot(imagematrix(strips))
+#shows the result of adding single look noise in multiplicative fashion to the original phantom. 
+#The background mean was set to 0.1, and the rest to 2.
+#The image is shown afterequalization.
+strips.Exp <- ((strips + 0.1) * 2) * rexp(256*256)
+plot(imagematrix(equalize(strips.Exp)))
+
+```
+
+```{r h_v}
+#shows a horizontal and e vertical transect of both the phantom (in dark violet)and the observed (in violet) data. 
+#The mean values (0.1 and 5) are shown as dashed black lines. 
+#This kind of representation is useful for checking the effect of filters around edges.
+### Transects
+## Vertical transect
+ggplot(as.data.frame(strips.Exp), aes(x=1:256)) +
+  geom_hline(yintercept = 0.1, linetype="longdash") +
+  geom_hline(yintercept = 5, linetype="longdash") +
+  geom_line(data=as.data.frame(strips), y=((strips + 0.1) * 2)[,223],
+            size=3, col="blueviolet", alpha=.5) +
+  geom_line(y=strips.Exp[,223], col="purple") +
+  expand_limits(y=range(strips.Exp[,223])) +
+  xlab("Line") + ylab("Observation") + ggtitle("Vertical transect") +
+  scale_x_continuous(breaks=c(1, 128, 256)) +
+  scale_y_continuous(breaks=c(5,10,60)) +
+  theme_few()
+
+## Horizontal transect
+ggplot(as.data.frame(strips.Exp), aes(x=1:256)) +
+  geom_hline(yintercept = 0.1, linetype="longdash") +
+  geom_hline(yintercept = 5, linetype="longdash") +
+  geom_line(data=as.data.frame(strips), y=((strips + 0.1) * 2)[214,],
+            size=3, col="blueviolet", alpha=.5) +
+  geom_line(y=strips.Exp[214,], col="purple") +
+  expand_limits(y=range(strips.Exp[214,])) +
+  xlab("Line") + ylab("Observation") + ggtitle("Horizontal transect") +
+  scale_x_continuous(breaks=c(1, 128, 256)) +
+  scale_y_continuous(breaks=c(5,10,60)) +
+  theme_few()
+```
+
+```{r Filters}
+## Mean
+SkeletonMean <- function(y, s) {
+  
+  # Input: the image and the side of the squared support
+  
+  # Output: filtered image z
+  
+  # Input image dimensions
+  m <- dim(y)[1]
+  n <- dim(y)[2]
+  
+  # Make space for the output image
+  z <- y
+  
+  # Main loop
+  margin <- (s+1)/2
+  marginm1 <- margin-1
+  for(k in margin:(m-margin)) {
+    for(ele in margin:(n-margin)) {
+      
+      values <- y[(k-marginm1):(k+marginm1),(ele-marginm1):(ele+marginm1)]
+      
+      z[k,ele] = mean(values)
+    }
+  }
+  
+  return(z)
+}
+
+
+## Median
+SkeletonMedian <- function(y, s) {
+  
+  # Input: the image and the side of the squared support
+  
+  # Output: filtered image z
+  
+  # Input image dimensions
+  m <- dim(y)[1]
+  n <- dim(y)[2]
+  
+  # Make space for the output image
+  z <- y
+  
+  # Main loop
+  margin <- (s+1)/2
+  marginm1 <- margin-1
+  for(k in margin:(m-margin)) {
+    for(ele in margin:(n-margin)) {
+      
+      values <- y[(k-marginm1):(k+marginm1),(ele-marginm1):(ele+marginm1)]
+      
+      z[k,ele] = median(values)
+    }
+  }
+  
+  return(z)
+}
+
+
+```
+
+```{r process}
+#shows the results of applying the mean filter to the observed data with windows of sizes 3 * 3 and 15 * 15.
+#The noise in the new images has been reduced, but at the expense of blocking effect and loss of small details.
+zMean3 <- SkeletonMean(strips.Exp, 3)
+plot(imagematrix(equalize(zMean3)))
+
+zMean15 <- SkeletonMean(strips.Exp, 15)
+plot(imagematrix(equalize(zMean15)))
+
+zMedian3 <- SkeletonMedian(strips.Exp, 3)
+plot(imagematrix(equalize(zMedian3)))
+
+zMedian15 <- SkeletonMedian(strips.Exp, 15)
+plot(imagematrix(equalize(zMedian15)))
+
+
+### Transects after filters
+
+transects.3 <- data.frame(
+  Line = 7:249,
+  Strips = as.vector(((strips + 0.1) * 2)[102,7:249]),
+  Mean = as.vector(zMean3[102,7:249]),
+  Median = as.vector(zMedian3[102,7:249]*sqrt(2))
+)
+
+transects.3.flat <- melt(transects.3, 
+                         measure.vars = c("Strips", "Mean", "Median"))
+names(transects.3.flat) <- c("Line", "Data", "Observations")
+#shows a horizontal transect after applying the mean and median filters of sizes 3×3 
+ggplot(transects.3.flat, 
+       aes(x=Line, y=Observations, col=Data)) + 
+  geom_line() +
+  geom_hline(yintercept = 0.1, linetype="longdash", col="cornsilk3") +
+  geom_hline(yintercept = 10, linetype="longdash", col="cornsilk3") +
+  xlab("Line") + ylab("Observation") + 
+  ggtitle("Horizontal transect, 3x3 windows") +
+  scale_x_continuous(breaks=c(4, 128, 252)) +
+  scale_y_continuous(breaks=c(5,10,60)) +
+  theme_few()
+
+transects.15 <- data.frame(
+  Line = 7:249,
+  Strips = as.vector(((strips + 0.1) * 2)[102,7:249]),
+  Mean = as.vector(zMean15[102,7:249]),
+  Median = as.vector(zMedian15[102,7:249]*sqrt(2))
+)
+
+transects.15.flat <- melt(transects.15, 
+                          measure.vars = c("Strips", "Mean", "Median"))
+names(transects.15.flat) <- c("Line", "Data", "Observations")
+#shows a horizontal transect after applying the mean and median filters of sizes 15×15
+ggplot(transects.15.flat, 
+       aes(x=Line, y=Observations, col=Data)) + 
+  geom_line() +
+  geom_hline(yintercept = 0.1, linetype="longdash", col="cornsilk3") +
+  geom_hline(yintercept = 10, linetype="longdash", col="cornsilk3") +
+  xlab("Line") + ylab("Observation") + 
+  ggtitle("Horizontal transect, 15x15 windows") +
+  scale_x_continuous(breaks=c(4, 128, 252)) +
+  scale_y_continuous(breaks=c(5,10,60)) +
+  theme_few()
+```
+
+Both mean filtering and median filtering can smooth the image and eliminate the noise. Mean filtering adopts linear method to average the pixel value in the whole window range. Mean filter itself has inherent defects. It can not protect the details of the image well, and in the process of denoising, it will destroy the details of the image and make the image become blurred, which leads to the failure to remove the noise points well. Mean filter is better than the impulse noise in filtering low frequency noise. The median filter adopts a nonlinear method, which is very effective in smoothing impulse noise. At the same time, it can protect the sharp edge of the image and select appropriate points to replace the value of the noise point. So it performs better for impulse noise than for low-frequency noise. In addition, the larger the filter is, the fuzzier the result will be, because the filter eliminates the detail of the image over a larger area.
